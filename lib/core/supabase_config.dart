@@ -1,0 +1,4 @@
+class SupabaseConfig {
+  static const String url = 'sb_publishable_dSvXCiW0YM0DxqpjoZzdKw_j6xex1lj';
+  static const String anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlkYmF1YmNsaHRoZ3Zvb2ltc2N0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA4ODI5NjQsImV4cCI6MjEwNjQ1ODk2NH0.jJDz0vCwQo4Ek4Ea0eihQtHuPTA39TOcbqS04xGod0w';
+}
