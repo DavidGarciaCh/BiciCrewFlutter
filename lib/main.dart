@@ -20,7 +20,7 @@ class BiciCrewApp extends StatelessWidget {
     return MaterialApp(
       title: 'BiciCrew',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(colorSchemeSeed: Colors.green, useMaterial3: true),
+      theme: ThemeData(colorSchemeSeed: const Color.fromARGB(255, 105, 26, 231), useMaterial3: true),
       home: const AuthGate(),
     );
   }
