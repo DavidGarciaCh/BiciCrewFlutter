@@ -1,56 +1,70 @@
 import 'package:flutter/material.dart';
-import '../../core/supabase_config.dart';
+import '../profile/profile_page.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
-  Future<Map<String, dynamic>> _loadProfile() {
-    return supabase
-        .from('profiles')
-        .select()
-        .eq('id', supabase.auth.currentUser!.id)
-        .single();
-  }
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  int _index = 0;
+
+  static const _pages = <Widget>[
+    _Placeholder('Inicio (feed)', Icons.home_outlined),
+    _Placeholder('Actividad (tracking)', Icons.directions_bike),
+    _Placeholder('Comunidades', Icons.groups_outlined),
+    ProfilePage(),
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('BiciCrew'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Cerrar sesión',
-            onPressed: () => supabase.auth.signOut(),
-          ),
+      // IndexedStack mantiene el estado de cada pestaña al cambiar entre ellas
+      body: IndexedStack(index: _index, children: _pages),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _index,
+        onDestinationSelected: (i) => setState(() => _index = i),
+        destinations: const [
+          NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: 'Inicio'),
+          NavigationDestination(
+              icon: Icon(Icons.directions_bike_outlined),
+              selectedIcon: Icon(Icons.directions_bike),
+              label: 'Actividad'),
+          NavigationDestination(
+              icon: Icon(Icons.groups_outlined),
+              selectedIcon: Icon(Icons.groups),
+              label: 'Comunidades'),
+          NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Perfil'),
         ],
       ),
-      body: Center(
-        child: FutureBuilder<Map<String, dynamic>>(
-          future: _loadProfile(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const CircularProgressIndicator();
-            }
-            if (snapshot.hasError) {
-              return Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text('Error al cargar el perfil:\n${snapshot.error}'),
-              );
-            }
-            final p = snapshot.data!;
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Image.asset('assets/images/logo.png', height: 100),
-                const SizedBox(height: 16),
-                Text('Hola, ${p['first_name']} ${p['last_name']}',
-                    style: Theme.of(context).textTheme.headlineSmall),
-                Text('${p['city']}, ${p['country']}  ·  rol: ${p['role']}'),
-              ],
-            );
-          },
-        ),
+    );
+  }
+}
+
+class _Placeholder extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  const _Placeholder(this.title, this.icon);
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 64, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(height: 12),
+          Text(title, style: Theme.of(context).textTheme.titleLarge),
+          const Text('Próximamente'),
+        ],
       ),
     );
   }

@@ -4,6 +4,7 @@ import '../../core/supabase_config.dart';
 import '../../core/utils.dart';
 import 'register_page.dart';
 import 'verify_otp_page.dart';
+import 'forgot_password_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -74,7 +75,7 @@ class _LoginPageState extends State<LoginPage> {
               key: _formKey,
               child: Column(
                 children: [
-                  Image.asset('assets/images/logo.png', height: 120),
+                  Image.asset('assets/images/FullLogoBiciCrew.png', height: 120),
                   const SizedBox(height: 12),
                   Text('BiciCrew',
                       style: Theme.of(context).textTheme.headlineMedium),
@@ -120,8 +121,15 @@ class _LoginPageState extends State<LoginPage> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Text('Iniciar sesión'),
-                    ),
+                    ),  
                   ),
+                  TextButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ForgotPasswordPage()),
+                      ),
+                      child: const Text('¿Olvidaste tu contraseña?'),
+                    ),
                   TextButton(
                     onPressed: () => Navigator.push(
                       context,
