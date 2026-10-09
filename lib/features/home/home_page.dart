@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../profile/profile_page.dart';
+import '../tracking/activity_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -13,7 +14,7 @@ class _HomePageState extends State<HomePage> {
 
   static const _pages = <Widget>[
     _Placeholder('Inicio (feed)', Icons.home_outlined),
-    _Placeholder('Actividad (tracking)', Icons.directions_bike),
+    ActivityPage(),
     _Placeholder('Comunidades', Icons.groups_outlined),
     ProfilePage(),
   ];
