@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.davidgarcia.bicicrew"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
