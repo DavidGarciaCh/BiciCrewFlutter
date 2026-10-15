@@ -125,7 +125,7 @@ class _ActivityPageState extends State<ActivityPage> {
               children: [
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.tunombre.bicicrew',
+                  userAgentPackageName: 'com.davidgarcia.bicicrew',
                 ),
                 PolylineLayer(
                   polylines: [
@@ -201,6 +201,20 @@ class _ActivityPageState extends State<ActivityPage> {
                   label: const Text('Iniciar actividad'),
                 ),
               ),
+              if (TrackingController.debugRelaxed) ...[
+                const SizedBox(height: 8),
+                DropdownButton<StreamMode>(
+                  value: c.streamMode,
+                  isExpanded: true,
+                  items: [
+                    for (final m in StreamMode.values)
+                      DropdownMenuItem(value: m, child: Text('Modo GPS: ${m.label}')),
+                  ],
+                  onChanged: (m) {
+                    if (m != null) c.setStreamMode(m);
+                  },
+                ),
+              ],
             ] else ...[
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -223,13 +237,17 @@ class _ActivityPageState extends State<ActivityPage> {
                 'Desnivel +${c.elevationGain.toStringAsFixed(0)} m',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
-              if (TrackingController.debugRelaxed)
-              Text(
-                'DEBUG · puntos: ${c.points.length} · '
-                'precisión: ${c.lastAccuracy?.toStringAsFixed(0) ?? "-"} m · '
-                'descartados: ${c.discarded}',
-                style: const TextStyle(fontSize: 11, color: Colors.orange),
-              ),
+             if (TrackingController.debugRelaxed)
+                Text(
+                  'DEBUG · modo: ${c.streamMode.label}\n'
+                  'stream: ${c.streamEvents} · respaldo: ${c.pollEvents} · '
+                  'puntos: ${c.points.length} · descartados: ${c.discarded}\n'
+                  'precisión: ${c.lastAccuracy?.toStringAsFixed(0) ?? "-"} m · '
+                  'último evento hace: ${c.secondsSinceStreamEvent ?? "-"} s\n'
+                  'error: ${c.lastError ?? "ninguno"}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 11, color: Colors.orange),
+                ),
               if (c.status == TrackingStatus.paused)
                 const Padding(
                   padding: EdgeInsets.only(top: 4),
