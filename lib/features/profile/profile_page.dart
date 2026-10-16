@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/supabase_config.dart';
 import '../../core/utils.dart';
+import '../social/friends_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -109,6 +110,20 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 8),
               Text(_email),
               Text('Rol: $_role', style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.people_outline),
+                title: const Text('Amigos y solicitudes'),
+                trailing: const Icon(Icons.chevron_right),
+                shape: RoundedRectangleBorder(
+                  side: BorderSide(color: Theme.of(context).dividerColor),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const FriendsPage()),
+                ),
+              ),
               const SizedBox(height: 24),
               _field(_firstName, 'Nombres', validator: _required),
               _field(_lastName, 'Apellidos', validator: _required),
