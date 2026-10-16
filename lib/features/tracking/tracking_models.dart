@@ -28,6 +28,7 @@ class TrackPoint {
 
 /// Resultado de una actividad terminada
 class ActivityResult {
+  final String id;
   final ActivityType type;
   final DateTime startedAt;
   final DateTime endedAt;
@@ -37,6 +38,7 @@ class ActivityResult {
   final List<List<LatLng>> segments;
   final List<TrackPoint> points;
   const ActivityResult({
+    required this.id,
     required this.type,
     required this.startedAt,
     required this.endedAt,
@@ -64,4 +66,9 @@ String formatPace(double? secondsPerKm) {
   }
   final total = secondsPerKm.round();
   return '${total ~/ 60}:${(total % 60).toString().padLeft(2, '0')}';
+}
+
+String formatDateTime(DateTime d) {
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(d.day)}/${two(d.month)}/${d.year} ${two(d.hour)}:${two(d.minute)}';
 }

@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart' hide ActivityType;
 import 'package:latlong2/latlong.dart';
-
 import '../../core/utils.dart';
 import 'activity_summary_page.dart';
 import 'tracking_controller.dart';
 import 'tracking_models.dart';
+import '../../core/supabase_config.dart';
+import 'data/activity_repository.dart';
+import 'data/sync_service.dart';
+import 'history_page.dart';
 
 class ActivityPage extends StatefulWidget {
   const ActivityPage({super.key});
@@ -26,6 +29,8 @@ class _ActivityPageState extends State<ActivityPage> {
     super.initState();
     _ctrl.addListener(_followUser);
     _ctrl.locateOnce();
+    WidgetsBinding.instance
+    .addPostFrameCallback((_) => _checkInterrupted());
   }
 
   @override
@@ -39,6 +44,53 @@ class _ActivityPageState extends State<ActivityPage> {
     final pos = _ctrl.currentPosition;
     if (pos != null && _mapReady) {
       _map.move(pos, _map.camera.zoom);
+    }
+  }
+
+    /// Si la app se cerró en medio de una actividad, ofrece guardarla.
+  Future<void> _checkInterrupted() async {
+    final uid = supabase.auth.currentUser?.id;
+    if (uid == null) return;
+    final repo = ActivityRepository.instance;
+    final a = await repo.findRecording(uid);
+    if (a == null || !mounted) return;
+
+    final recover = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        title: const Text('Actividad interrumpida'),
+        content: Text(
+          'La app se cerró durante una actividad '
+          '(${(a.distanceM / 1000).toStringAsFixed(2)} km, '
+          '${formatDuration(Duration(seconds: a.durationS))}). '
+          '¿Quieres guardarla?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Descartar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+
+    if (recover == true) {
+      final ok = await repo.recoverInterrupted(a.id);
+      if (!mounted) return;
+      if (ok) {
+        SyncService.instance.syncPending();
+        showMessage(context, 'Actividad recuperada');
+      } else {
+        showMessage(context, 'La actividad era demasiado corta y se descartó',
+            error: true);
+      }
+    } else {
+      await repo.delete(a.id);
     }
   }
 
@@ -88,15 +140,15 @@ class _ActivityPageState extends State<ActivityPage> {
       ),
     );
     if (ok != true || !mounted) return;
-    final result = _ctrl.finish();
+    final result = await _ctrl.finish();
+    if (!mounted) return;
     if (result.points.length < 2) {
-      showMessage(
-        context,
-        'Actividad demasiado corta, no se registró.',
-        error: true,
-      );
+      showMessage(context, 'Actividad demasiado corta, no se registró.',
+          error: true);
       return;
     }
+    SyncService.instance.syncPending(); // en segundo plano, sin esperar
+    showMessage(context, 'Actividad guardada en tu celular');
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => ActivitySummaryPage(result: result)),
@@ -157,6 +209,27 @@ class _ActivityPageState extends State<ActivityPage> {
                   ),
               ],
             ),
+
+            Positioned(
+              top: 8,
+              right: 8,
+              child: SafeArea(
+                child: Material(
+                  color: Theme.of(context).colorScheme.surface,
+                  shape: const CircleBorder(),
+                  elevation: 4,
+                  child: IconButton(
+                    icon: const Icon(Icons.history),
+                    tooltip: 'Historial',
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const HistoryPage()),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
             Positioned(
               left: 12,
               right: 12,

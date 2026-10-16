@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../profile/profile_page.dart';
 import '../tracking/activity_page.dart';
+import '../tracking/data/sync_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -11,6 +12,12 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    SyncService.instance.start();
+  }
 
   static const _pages = <Widget>[
     _Placeholder('Inicio (feed)', Icons.home_outlined),

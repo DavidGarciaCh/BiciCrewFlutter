@@ -5,6 +5,9 @@ import 'package:geolocator_android/geolocator_android.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'tracking_models.dart';
+import 'package:uuid/uuid.dart';
+import '../../core/supabase_config.dart';
+import 'data/activity_repository.dart';
 
 enum TrackingStatus { idle, running, paused }
 
@@ -26,7 +29,7 @@ class _Sample {
 
 class TrackingController extends ChangeNotifier {
   // Solo para diagnóstico y pruebas. False por defecto para despliegue final.
-  static const bool debugRelaxed = false;
+  static const bool debugRelaxed = true;
 
   static const double maxAccuracy = 25; // metros
   static const double minStepMeters = 5; // desplazamiento mínimo entre puntos
@@ -48,6 +51,8 @@ class TrackingController extends ChangeNotifier {
   double elevationGain = 0;
   LatLng? currentPosition;
   DateTime? startedAt;
+  String? activityId;
+  final _repo = ActivityRepository.instance;
 
   // ---- Diagnóstico ----
   int streamEvents = 0;
@@ -119,6 +124,9 @@ class TrackingController extends ChangeNotifier {
     final error = await _ensurePermissions();
     if (error != null) return error;
 
+    final uid = supabase.auth.currentUser?.id;
+    if (uid == null) return 'Tu sesión expiró. Inicia sesión de nuevo.';
+
     segments
       ..clear()
       ..add([]);
@@ -132,6 +140,20 @@ class TrackingController extends ChangeNotifier {
     lastError = null;
     _lastStreamAt = null;
     startedAt = DateTime.now();
+
+    // El id lo genera el celular: es la clave para no duplicar al sincronizar
+    activityId = const Uuid().v4();
+    try {
+      await _repo.create(
+        id: activityId!,
+        userId: uid,
+        type: type,
+        startedAt: startedAt!,
+      );
+    } catch (e) {
+      return 'No se pudo preparar el guardado local: $e';
+    }
+
     _stopwatch
       ..reset()
       ..start();
@@ -161,10 +183,12 @@ class TrackingController extends ChangeNotifier {
     notifyListeners();
   }
 
-  ActivityResult finish() {
+    Future<ActivityResult> finish() async {
     _stopwatch.stop();
     _stopSources();
+    final id = activityId!;
     final result = ActivityResult(
+      id: id,
       type: type,
       startedAt: startedAt ?? DateTime.now(),
       endedAt: DateTime.now(),
@@ -176,6 +200,22 @@ class TrackingController extends ChangeNotifier {
     );
     status = TrackingStatus.idle;
     notifyListeners();
+    try {
+      if (points.length < 2) {
+        await _repo.delete(id); // demasiado corta: no se guarda
+      } else {
+        await _repo.finish(
+          id,
+          endedAt: result.endedAt,
+          durationS: result.duration.inSeconds,
+          distanceM: distanceMeters,
+          elevationM: elevationGain,
+        );
+      }
+    } catch (_) {
+      // Si falla, la actividad queda "recording" y se ofrecerá recuperarla
+    }
+    activityId = null;
     return result;
   }
 
@@ -209,6 +249,24 @@ class TrackingController extends ChangeNotifier {
         notifyListeners();
       },
     );
+  }
+
+    /// Escribe el punto en SQLite al instante (RNF-15).
+  void _persist(TrackPoint point) {
+    final id = activityId;
+    if (id == null) return;
+    _repo
+        .addPoint(
+          activityId: id,
+          segment: segments.length - 1,
+          point: point,
+          durationS: elapsed.inSeconds,
+          distanceM: distanceMeters,
+          elevationM: elevationGain,
+        )
+        .catchError((Object e) {
+      lastError = 'BD local: $e';
+    });
   }
 
   /// Respaldo: si el stream lleva más de 4 s sin entregar nada, pedimos la
@@ -323,7 +381,8 @@ class TrackingController extends ChangeNotifier {
 
     _window.add(_Sample(p.timestamp, distanceMeters));
     _window.removeWhere(
-        (s) => p.timestamp.difference(s.time).inSeconds > 45);
+      (s) => p.timestamp.difference(s.time).inSeconds > 45);
+    _persist(point);
     notifyListeners();
   }
 
