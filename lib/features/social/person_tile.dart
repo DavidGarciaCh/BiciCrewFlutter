@@ -2,33 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/utils.dart';
 import 'social_repository.dart';
-
-Future<bool> confirmAction(
-  BuildContext context, {
-  required String title,
-  required String message,
-  required String confirmLabel,
-}) async {
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: Text(title),
-      content: Text(message),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, true),
-          child: Text(confirmLabel),
-        ),
-      ],
-    ),
-  );
-  return ok == true;
-}
-
+  
 class PersonTile extends StatelessWidget {
   final Person person;
   final VoidCallback onChanged;
