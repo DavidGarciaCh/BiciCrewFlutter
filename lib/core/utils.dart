@@ -21,6 +21,9 @@ class AppException implements Exception {
 String errorText(Object e) {
   if (e is PostgrestException) return e.message;
   if (e is AppException) return e.message;
+  if (e is StorageException) {
+    return 'No se pudo subir la imagen. Revisa tu conexión e inténtalo de nuevo.';
+  }
   return 'Error de conexión. Intenta de nuevo.';
 }
 

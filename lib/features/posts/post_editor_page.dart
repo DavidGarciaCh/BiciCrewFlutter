@@ -7,6 +7,9 @@ import '../tracking/tracking_models.dart';
 import 'post_models.dart';
 import 'posts_repository.dart';
 import 'route_map.dart';
+import 'dart:typed_data';
+import 'package:image_picker/image_picker.dart';
+import 'post_image.dart';
 
 class PostEditorPage extends StatefulWidget {
   final String? type; // al crear
@@ -37,6 +40,11 @@ class _PostEditorPageState extends State<PostEditorPage> {
   bool _loadingActivities = false;
 
   bool _saving = false;
+    // Imagen de la novedad
+  final _picker = ImagePicker();
+  String? _imagePath; // ruta ya guardada en Storage
+  XFile? _newImage; // foto elegida, aún sin subir
+  Uint8List? _newImageBytes; // para la vista previa
   bool get _editing => widget.post != null;
 
   @override
@@ -56,6 +64,7 @@ class _PostEditorPageState extends State<PostEditorPage> {
       }
       final cat = p.payload['category'] as String?;
       if (cat != null && reportCategories.containsKey(cat)) _category = cat;
+      _imagePath = p.imagePath;
     } else if (_type == 'route_completed') {
       _loadActivities();
     }
@@ -118,7 +127,7 @@ class _PostEditorPageState extends State<PostEditorPage> {
         DateTime(date.year, date.month, date.day, time.hour, time.minute));
   }
 
-  Map<String, dynamic> _buildPayload() {
+    Map<String, dynamic> _buildPayload(String? imagePath) {
     switch (_type) {
       case 'route_planned':
         return {
@@ -128,7 +137,11 @@ class _PostEditorPageState extends State<PostEditorPage> {
           'activity_type': _activityType,
         };
       case 'report':
-        return {'category': _category, 'location_text': _location.text.trim()};
+        return {
+          'category': _category,
+          'location_text': _location.text.trim(),
+          if (imagePath != null) 'image_path': imagePath,
+        };
       default:
         return {}; // ruta completada: el servidor arma el contenido
     }
@@ -138,27 +151,123 @@ class _PostEditorPageState extends State<PostEditorPage> {
     FocusScope.of(context).unfocus();
     final status = publish ? 'published' : 'draft';
     setState(() => _saving = true);
+    String? uploaded; // imagen subida en esta operación
     try {
+      var imagePath = _imagePath;
+      if (_type == 'report' && _newImage != null) {
+        uploaded = await _repo.uploadImage(_newImage!);
+        imagePath = uploaded;
+      }
+      final payload = _buildPayload(imagePath);
       if (_editing) {
         await _repo.update(widget.post!.id,
-            status: status, body: _body.text.trim(), payload: _buildPayload());
+            status: status, body: _body.text.trim(), payload: payload);
       } else {
         await _repo.create(
           type: _type,
           status: status,
           body: _body.text.trim(),
           activityId: _activityId,
-          payload: _buildPayload(),
+          payload: payload,
         );
       }
+      // Guardado con éxito: se borra la imagen anterior si se cambió o quitó
+      final old = widget.post?.payload['image_path'] as String?;
+      if (old != null && old != imagePath) await _repo.deleteImage(old);
       if (!mounted) return;
       showMessage(context, publish ? 'Publicación guardada' : 'Borrador guardado');
       Navigator.pop(context, true);
     } catch (e) {
+      // Si falló el guardado, no dejamos la imagen nueva huérfana
+      if (uploaded != null) await _repo.deleteImage(uploaded);
       if (mounted) showMessage(context, errorText(e), error: true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+    Future<void> _pickImage() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Tomar foto'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Elegir de la galería'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+    try {
+      // La foto se reduce aquí: máximo 1600 px y calidad 80
+      final file = await _picker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 80,
+      );
+      if (file == null || !mounted) return;
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _newImage = file;
+        _newImageBytes = bytes;
+      });
+    } catch (_) {
+      if (mounted) {
+        showMessage(context, 'No se pudo abrir la cámara o la galería',
+            error: true);
+      }
+    }
+  }
+
+  Widget _imageSection() {
+    final hasNew = _newImageBytes != null;
+    final hasOld = _imagePath != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (hasNew)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.memory(_newImageBytes!,
+                height: 200, width: double.infinity, fit: BoxFit.cover),
+          )
+        else if (hasOld)
+          PostImage(path: _imagePath!),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            OutlinedButton.icon(
+              icon: const Icon(Icons.add_a_photo_outlined),
+              label: Text(hasNew || hasOld ? 'Cambiar foto' : 'Agregar foto'),
+              onPressed: _saving ? null : _pickImage,
+            ),
+            if (hasNew || hasOld)
+              TextButton(
+                onPressed: _saving
+                    ? null
+                    : () => setState(() {
+                          _newImage = null;
+                          _newImageBytes = null;
+                          _imagePath = null;
+                        }),
+                child: const Text('Quitar'),
+              ),
+          ],
+        ),
+      ],
+    );
   }
 
   // ---------- Campos según el tipo ----------
@@ -264,6 +373,8 @@ class _PostEditorPageState extends State<PostEditorPage> {
                 prefixIcon: Icon(Icons.place_outlined),
                 border: OutlineInputBorder()),
           ),
+          const SizedBox(height: 12),
+          _imageSection(),
         ];
     }
   }

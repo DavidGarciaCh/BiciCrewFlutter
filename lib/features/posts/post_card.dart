@@ -6,6 +6,8 @@ import 'comments_page.dart';
 import 'post_models.dart';
 import 'posts_repository.dart';
 import 'route_map.dart';
+import 'attendees_page.dart';
+import 'post_image.dart';
 
 class PostCard extends StatefulWidget {
   final Post post;
@@ -20,7 +22,84 @@ class PostCard extends StatefulWidget {
 class _PostCardState extends State<PostCard> {
   final _repo = PostsRepository.instance;
   bool _busy = false;
+  bool _attendBusy = false;
   Post get _post => widget.post;
+
+  Future<void> _setAttendance(String status) async {
+    if (_attendBusy) return;
+    final post = _post;
+    final previous = post.myAttendance;
+    // Tocar la marca activa la quita
+    final next = previous == status ? 'none' : status;
+    setState(() {
+      _attendBusy = true;
+      post.myAttendance = next == 'none' ? null : next;
+    });
+    try {
+      await _repo.setAttendance(post.id, next);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => post.myAttendance = previous);
+      showMessage(context, errorText(e), error: true);
+    } finally {
+      if (mounted) setState(() => _attendBusy = false);
+    }
+  }
+
+  Widget _attendButton(String status, String label, IconData icon) {
+    final selected = _post.myAttendance == status;
+    final onPressed = _attendBusy ? null : () => _setAttendance(status);
+    return selected
+        ? FilledButton.icon(
+            onPressed: onPressed, icon: Icon(icon), label: Text(label))
+        : OutlinedButton.icon(
+            onPressed: onPressed, icon: Icon(icon), label: Text(label));
+  }
+
+  Widget _attendance(DateTime? starts, bool mine) {
+    final p = _post;
+    if (mine) {
+      // El organizador ve los contadores y la lista
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Row(
+          children: [
+            const Icon(Icons.groups_outlined, size: 18),
+            const SizedBox(width: 6),
+            Expanded(
+                child: Text(
+                    '${p.goingCount} irán · ${p.interestedCount} interesados')),
+            TextButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => AttendeesPage(post: p)),
+              ),
+              child: const Text('Ver lista'),
+            ),
+          ],
+        ),
+      );
+    }
+    final started = starts != null && starts.isBefore(DateTime.now());
+    if (started) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text('Esta ruta ya comenzó',
+            style: Theme.of(context).textTheme.bodySmall),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          Expanded(child: _attendButton('going', 'Voy', Icons.check_circle_outline)),
+          const SizedBox(width: 8),
+          Expanded(
+              child: _attendButton('interested', 'Me interesa', Icons.star_outline)),
+        ],
+      ),
+    );
+  }
 
   Future<void> _toggleLike() async {
     if (_busy) return;
@@ -119,13 +198,14 @@ class _PostCardState extends State<PostCard> {
     );
   }
 
-  Widget _planned() {
+   Widget _planned() {
     final p = _post;
     final title = p.payload['title'] as String? ?? '';
     final meeting = p.payload['meeting_point'] as String? ?? '';
     final starts =
         DateTime.tryParse(p.payload['starts_at'] as String? ?? '')?.toLocal();
     final type = p.activityType;
+    final mine = p.authorId == supabase.auth.currentUser?.id;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -137,6 +217,7 @@ class _PostCardState extends State<PostCard> {
         _infoRow(Icons.place_outlined, meeting),
         if (starts != null) _infoRow(Icons.schedule, formatDateTime(starts)),
         if (type != null) _infoRow(type.icon, type.label),
+        _attendance(starts, mine),
       ],
     );
   }
@@ -145,6 +226,7 @@ class _PostCardState extends State<PostCard> {
     final p = _post;
     final cat = p.payload['category'] as String? ?? 'other';
     final loc = p.payload['location_text'] as String? ?? '';
+    final img = p.imagePath;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -153,6 +235,11 @@ class _PostCardState extends State<PostCard> {
           label: Text(reportCategories[cat] ?? 'Otro'),
         ),
         if (loc.isNotEmpty) _infoRow(Icons.place_outlined, loc),
+        if (img != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: PostImage(path: img),
+          ),
       ],
     );
   }

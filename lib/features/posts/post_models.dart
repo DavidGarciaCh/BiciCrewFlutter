@@ -42,6 +42,9 @@ class Post {
   int likeCount;
   int commentCount;
   bool likedByMe;
+  String? myAttendance; // going | interested | null
+  int goingCount;
+  int interestedCount;
 
   Post({
     required this.id,
@@ -57,6 +60,9 @@ class Post {
     this.likeCount = 0,
     this.commentCount = 0,
     this.likedByMe = false,
+    this.myAttendance = null,
+    this.goingCount = 0,
+    this.interestedCount = 0,
   });
 
   static DateTime? _date(dynamic v) =>
@@ -80,6 +86,9 @@ class Post {
         likeCount: (r['like_count'] as num?)?.toInt() ?? 0,
         commentCount: (r['comment_count'] as num?)?.toInt() ?? 0,
         likedByMe: r['liked_by_me'] as bool? ?? false,
+        myAttendance: r['my_attendance'] as String?,
+        goingCount: (r['going_count'] as num?)?.toInt() ?? 0,
+        interestedCount: (r['interested_count'] as num?)?.toInt() ?? 0,
       );
 
   /// Fila de la tabla posts (para "Mis publicaciones")
@@ -102,6 +111,11 @@ class Post {
   int get durationSeconds => (payload['duration_seconds'] as num?)?.toInt() ?? 0;
   double get elevationGain =>
       (payload['elevation_gain_meters'] as num?)?.toDouble() ?? 0;
+    /// Ruta de la imagen en Storage (solo novedades)
+  String? get imagePath {
+    final v = payload['image_path'];
+    return v is String && v.isNotEmpty ? v : null;
+  }
 
   ActivityType? get activityType {
     final name = payload['activity_type'];
@@ -153,6 +167,26 @@ class Comment {
       authorId: r['author_id'] as String,
       authorName: name.isEmpty ? 'Usuario' : name,
       body: r['body'] as String,
+      createdAt: DateTime.parse(r['created_at'] as String).toLocal(),
+    );
+  }
+}
+
+class Attendee {
+  final String name;
+  final String status; // going | interested
+  final DateTime createdAt;
+  const Attendee(
+      {required this.name, required this.status, required this.createdAt});
+
+  factory Attendee.fromRow(Map<String, dynamic> r) {
+    final u = r['user'];
+    final first = u is Map ? (u['first_name'] as String? ?? '') : '';
+    final last = u is Map ? (u['last_name'] as String? ?? '') : '';
+    final name = '$first $last'.trim();
+    return Attendee(
+      name: name.isEmpty ? 'Usuario' : name,
+      status: r['status'] as String,
       createdAt: DateTime.parse(r['created_at'] as String).toLocal(),
     );
   }

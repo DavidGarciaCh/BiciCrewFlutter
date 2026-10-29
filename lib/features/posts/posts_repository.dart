@@ -2,6 +2,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/supabase_config.dart';
 import '../../core/utils.dart';
 import 'post_models.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
 
 class PostsRepository {
   PostsRepository._();
@@ -26,6 +28,61 @@ class PostsRepository {
         .eq('author_id', uid)
         .order('updated_at', ascending: false);
     return rows.map((r) => Post.fromTable(r)).toList();
+  }
+
+    // ---------- Imágenes (Storage) ----------
+  static const _bucket = 'post-images';
+
+  /// Sube la imagen a {mi_id}/{uuid}.{ext} y devuelve la ruta
+  Future<String> uploadImage(XFile file) async {
+    final name = file.name.toLowerCase();
+    final ext = const ['jpg', 'jpeg', 'png', 'webp']
+        .where((e) => name.endsWith('.$e'))
+        .firstOrNull;
+    if (ext == null) {
+      throw const AppException('Formato no admitido. Usa JPG, PNG o WebP.');
+    }
+    final bytes = await file.readAsBytes();
+    if (bytes.length > 2 * 1024 * 1024) {
+      throw const AppException('La imagen supera los 2 MB. Elige una más liviana.');
+    }
+    final mime = switch (ext) {
+      'png' => 'image/png',
+      'webp' => 'image/webp',
+      _ => 'image/jpeg',
+    };
+    final path = '${supabase.auth.currentUser!.id}/${const Uuid().v4()}.$ext';
+    await supabase.storage.from(_bucket).uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(contentType: mime, upsert: false),
+        );
+    return path;
+  }
+
+  /// Borra una imagen; si falla no interrumpe nada (queda huérfana)
+  Future<void> deleteImage(String path) async {
+    try {
+      await supabase.storage.from(_bucket).remove([path]);
+    } catch (_) {}
+  }
+
+  // ---------- Asistencia a rutas planeadas ----------
+  /// status: 'going' | 'interested' | 'none'
+  Future<void> setAttendance(String postId, String status) async {
+    await supabase.rpc('set_attendance',
+        params: {'p_post_id': postId, 'new_status': status});
+  }
+
+  /// Solo el organizador recibe filas (lo garantiza la RLS)
+  Future<List<Attendee>> attendees(String postId) async {
+    final rows = await supabase
+        .from('post_attendance')
+        .select('status, created_at, '
+            'user:profiles!post_attendance_user_id_fkey(first_name, last_name)')
+        .eq('post_id', postId)
+        .order('created_at', ascending: true);
+    return rows.map((r) => Attendee.fromRow(r)).toList();
   }
 
   // ---------- Crear, editar, eliminar ----------
@@ -61,11 +118,12 @@ class PostsRepository {
     }
   }
 
-  Future<void> delete(String id) async {
+  Future<void> delete(String id, {String? imagePath}) async {
     final res = await supabase.from('posts').delete().eq('id', id).select();
     if (res.isEmpty) {
       throw const AppException('No se pudo eliminar la publicación');
     }
+    if (imagePath != null) await deleteImage(imagePath);
   }
 
   // ---------- Me gusta ----------
