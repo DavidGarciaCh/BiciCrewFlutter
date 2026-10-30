@@ -3,6 +3,7 @@ import '../profile/profile_page.dart';
 import '../tracking/activity_page.dart';
 import '../tracking/data/sync_service.dart';
 import '../posts/feed_page.dart';
+import '../communities/communities_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -23,7 +24,7 @@ class _HomePageState extends State<HomePage> {
   static const _pages = <Widget>[
     FeedPage(),
     ActivityPage(),
-    _Placeholder('Comunidades', Icons.groups_outlined),
+    CommunitiesPage(),
     ProfilePage(),
   ];
 

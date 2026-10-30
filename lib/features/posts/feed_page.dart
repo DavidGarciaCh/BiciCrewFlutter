@@ -6,6 +6,8 @@ import 'post_card.dart';
 import 'post_editor_page.dart';
 import 'post_models.dart';
 import 'posts_repository.dart';
+import '../search/search_page.dart';
+import 'new_post_flow.dart';
 
 class FeedPage extends StatefulWidget {
   const FeedPage({super.key});
@@ -82,37 +84,8 @@ class _FeedPageState extends State<FeedPage> {
     }
   }
 
-  String _hint(String type) => switch (type) {
-        'route_completed' => 'Comparte una actividad ya sincronizada',
-        'route_planned' => 'Invita a tus amigos a una salida',
-        _ => 'Avisa de vías cerradas o problemas de tránsito',
-      };
-
   Future<void> _newPost() async {
-    final type = await showModalBottomSheet<String>(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const ListTile(title: Text('¿Qué quieres publicar?')),
-            for (final e in postTypeLabels.entries)
-              ListTile(
-                leading: Icon(postTypeIcons[e.key]),
-                title: Text(e.value),
-                subtitle: Text(_hint(e.key)),
-                onTap: () => Navigator.pop(context, e.key),
-              ),
-          ],
-        ),
-      ),
-    );
-    if (type == null || !mounted) return;
-    final ok = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (_) => PostEditorPage(type: type)),
-    );
-    if (ok == true) _loadFirst();
+    if (await startNewPost(context)) _loadFirst();
   }
 
   Future<void> _edit(Post p) async {
@@ -211,6 +184,12 @@ class _FeedPageState extends State<FeedPage> {
       appBar: AppBar(
         title: const Text('BiciCrew'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            tooltip: 'Buscar',
+            onPressed: () => Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const SearchPage())),
+          ),
           IconButton(
             icon: const Icon(Icons.people_outline),
             tooltip: 'Amigos',

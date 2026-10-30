@@ -276,7 +276,7 @@ class _PostCardState extends State<PostCard> {
                     ],
                   ),
                 ),
-                if (mine)
+                  if (mine && (widget.onEdit != null || widget.onDelete != null))
                   PopupMenuButton<String>(
                     onSelected: (v) {
                       if (v == 'edit') widget.onEdit?.call(p);

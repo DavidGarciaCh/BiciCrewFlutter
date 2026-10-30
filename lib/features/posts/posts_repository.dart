@@ -10,10 +10,17 @@ class PostsRepository {
   static final PostsRepository instance = PostsRepository._();
 
   // ---------- Feed ----------
-  Future<List<Post>> feed({DateTime? olderThan, int pageSize = 15}) async {
+  Future<List<Post>> feed({
+    DateTime? olderThan,
+    int pageSize = 15,
+    String? communityId,
+    String? search,
+  }) async {
     final data = await supabase.rpc('get_feed', params: {
       'older_than': olderThan?.toUtc().toIso8601String(),
       'page_size': pageSize,
+      'community_filter': communityId,
+      'search_term': search,
     }) as List;
     return data
         .map((r) => Post.fromFeed(Map<String, dynamic>.from(r as Map)))
@@ -28,6 +35,20 @@ class PostsRepository {
         .eq('author_id', uid)
         .order('updated_at', ascending: false);
     return rows.map((r) => Post.fromTable(r)).toList();
+  }
+
+  // ---------- Comunidades de una publicación ----------
+  Future<List<String>> postCommunityIds(String postId) async {
+    final rows = await supabase
+        .from('post_communities')
+        .select('community_id')
+        .eq('post_id', postId);
+    return rows.map((r) => r['community_id'] as String).toList();
+  }
+
+  Future<void> setPostCommunities(String postId, List<String> ids) async {
+    await supabase.rpc('set_post_communities',
+        params: {'p_post_id': postId, 'p_community_ids': ids});
   }
 
     // ---------- Imágenes (Storage) ----------

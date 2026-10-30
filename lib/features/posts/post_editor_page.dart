@@ -10,11 +10,15 @@ import 'route_map.dart';
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'post_image.dart';
+import '../communities/communities_repository.dart';
+import '../communities/community_models.dart';
 
 class PostEditorPage extends StatefulWidget {
   final String? type; // al crear
   final Post? post; // al editar
-  const PostEditorPage({super.key, this.type, this.post})
+  final List<String> initialCommunityIds;
+  const PostEditorPage(
+      {super.key, this.type, this.post, this.initialCommunityIds = const []})
       : assert(type != null || post != null);
 
   @override
@@ -40,6 +44,9 @@ class _PostEditorPageState extends State<PostEditorPage> {
   bool _loadingActivities = false;
 
   bool _saving = false;
+    // Comunidades del usuario
+  List<Community> _myCommunities = [];
+  final Set<String> _communityIds = {};
     // Imagen de la novedad
   final _picker = ImagePicker();
   String? _imagePath; // ruta ya guardada en Storage
@@ -68,6 +75,8 @@ class _PostEditorPageState extends State<PostEditorPage> {
     } else if (_type == 'route_completed') {
       _loadActivities();
     }
+    _communityIds.addAll(widget.initialCommunityIds);
+    _loadCommunities();
   }
 
   @override
@@ -147,7 +156,7 @@ class _PostEditorPageState extends State<PostEditorPage> {
     }
   }
 
-  Future<void> _save({required bool publish}) async {
+    Future<void> _save({required bool publish}) async {
     FocusScope.of(context).unfocus();
     final status = publish ? 'published' : 'draft';
     setState(() => _saving = true);
@@ -159,9 +168,11 @@ class _PostEditorPageState extends State<PostEditorPage> {
         imagePath = uploaded;
       }
       final payload = _buildPayload(imagePath);
+      String? postId;
       if (_editing) {
         await _repo.update(widget.post!.id,
             status: status, body: _body.text.trim(), payload: payload);
+        postId = widget.post!.id;
       } else {
         await _repo.create(
           type: _type,
@@ -171,14 +182,32 @@ class _PostEditorPageState extends State<PostEditorPage> {
           payload: payload,
         );
       }
-      // Guardado con éxito: se borra la imagen anterior si se cambió o quitó
+
+      // Comunidades: si falla, la publicación ya quedó guardada
+      String? warning;
+      if (postId != null && (_editing || _communityIds.isNotEmpty)) {
+        try {
+          await _repo.setPostCommunities(postId, _communityIds.toList());
+        } catch (e) {
+          warning = errorText(e);
+        }
+      }
+
       final old = widget.post?.payload['image_path'] as String?;
       if (old != null && old != imagePath) await _repo.deleteImage(old);
       if (!mounted) return;
-      showMessage(context, publish ? 'Publicación guardada' : 'Borrador guardado');
+      if (warning != null) {
+        showMessage(
+            context,
+            'La publicación se guardó, pero no se pudo compartir en las '
+            'comunidades: $warning',
+            error: true);
+      } else {
+        showMessage(
+            context, publish ? 'Publicación guardada' : 'Borrador guardado');
+      }
       Navigator.pop(context, true);
     } catch (e) {
-      // Si falló el guardado, no dejamos la imagen nueva huérfana
       if (uploaded != null) await _repo.deleteImage(uploaded);
       if (mounted) showMessage(context, errorText(e), error: true);
     } finally {
@@ -268,6 +297,47 @@ class _PostEditorPageState extends State<PostEditorPage> {
         ),
       ],
     );
+  }
+
+    Future<void> _loadCommunities() async {
+    try {
+      final mine = await CommunitiesRepository.instance.mine();
+      final current = widget.post == null
+          ? <String>[]
+          : await _repo.postCommunityIds(widget.post!.id);
+      if (!mounted) return;
+      setState(() {
+        _myCommunities = mine;
+        _communityIds.addAll(current);
+      });
+    } catch (_) {}
+  }
+
+  List<Widget> _communitiesSection() {
+    if (_myCommunities.isEmpty) return [];
+    return [
+      const SizedBox(height: 16),
+      Text('Compartir también en comunidades (máx. 5)',
+          style: Theme.of(context).textTheme.titleSmall),
+      const SizedBox(height: 4),
+      Wrap(
+        spacing: 8,
+        children: [
+          for (final c in _myCommunities)
+            FilterChip(
+              label: Text(c.name),
+              selected: _communityIds.contains(c.id),
+              onSelected: (v) => setState(() {
+                if (v) {
+                  _communityIds.add(c.id);
+                } else {
+                  _communityIds.remove(c.id);
+                }
+              }),
+            ),
+        ],
+      ),
+    ];
   }
 
   // ---------- Campos según el tipo ----------
@@ -399,6 +469,7 @@ class _PostEditorPageState extends State<PostEditorPage> {
           padding: const EdgeInsets.all(16),
           children: [
             ..._typeFields(),
+            ..._communitiesSection(),
             const SizedBox(height: 12),
             TextField(
               controller: _body,
