@@ -62,14 +62,19 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   // ---------- Solo pruebas: crea actividades simuladas ----------
-  Future<void> _createTest({required bool interrupted}) async {
+  Future<void> _createTest({
+    bool interrupted = false,
+    int secondsPerPoint = 6,
+    double latOffset = 0,
+  }) async {
     final uid = supabase.auth.currentUser!.id;
     final id = const Uuid().v4();
-    final start = DateTime.now().subtract(const Duration(minutes: 20));
+    final start = DateTime.now()
+        .subtract(Duration(seconds: 120 * secondsPerPoint + 300));
     await _repo.create(
         id: id, userId: uid, type: ActivityType.walk, startedAt: start);
 
-    double lat = 3.4516, lng = -76.5320, dist = 0;
+    double lat = 3.4516 + latOffset, lng = -76.5320, dist = 0;
     for (var i = 1; i <= 120; i++) {
       final nlat = lat + 0.00005;
       final nlng = lng + 0.00003;
@@ -84,17 +89,17 @@ class _HistoryPageState extends State<HistoryPage> {
           lng: lng,
           alt: 1000 + i * 0.1,
           accuracy: 5,
-          time: start.add(Duration(seconds: i * 6)),
+          time: start.add(Duration(seconds: i * secondsPerPoint)),
         ),
-        durationS: i * 6,
+        durationS: i * secondsPerPoint,
         distanceM: dist,
         elevationM: 12,
       );
     }
     if (!interrupted) {
       await _repo.finish(id,
-          endedAt: start.add(const Duration(seconds: 720)),
-          durationS: 720,
+          endedAt: start.add(Duration(seconds: 120 * secondsPerPoint)),
+          durationS: 120 * secondsPerPoint,
           distanceM: dist,
           elevationM: 12);
       _sync.syncPending();
@@ -137,13 +142,22 @@ class _HistoryPageState extends State<HistoryPage> {
         title: const Text('Mis actividades'),
         actions: [
           if (TrackingController.debugRelaxed)
-            PopupMenuButton<bool>(
+            PopupMenuButton<String>(
               icon: const Icon(Icons.bug_report),
               tooltip: 'Pruebas',
-              onSelected: (interrupted) => _createTest(interrupted: interrupted),
+              onSelected: (v) => switch (v) {
+                'fast' => _createTest(secondsPerPoint: 3),
+                'slow' => _createTest(secondsPerPoint: 9),
+                'far' => _createTest(latOffset: 0.01),
+                'interrupted' => _createTest(interrupted: true),
+                _ => _createTest(),
+              },
               itemBuilder: (_) => const [
-                PopupMenuItem(value: false, child: Text('Crear actividad de prueba')),
-                PopupMenuItem(value: true, child: Text('Simular actividad interrumpida')),
+                PopupMenuItem(value: 'normal', child: Text('Actividad de prueba (normal)')),
+                PopupMenuItem(value: 'fast', child: Text('Actividad de prueba (rápida)')),
+                PopupMenuItem(value: 'slow', child: Text('Actividad de prueba (lenta)')),
+                PopupMenuItem(value: 'far', child: Text('Actividad de prueba (otra ruta)')),
+                PopupMenuItem(value: 'interrupted', child: Text('Simular actividad interrumpida')),
               ],
             ),
           ValueListenableBuilder<bool>(

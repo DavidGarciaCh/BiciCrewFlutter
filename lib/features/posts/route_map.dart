@@ -31,7 +31,7 @@ class RouteMap extends StatelessWidget {
           children: [
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.tunombre.bicicrew',
+              userAgentPackageName: 'com.davidgarcia.bicicrew',
             ),
             PolylineLayer(
               polylines: [

@@ -4,6 +4,7 @@ import '../tracking/activity_page.dart';
 import '../tracking/data/sync_service.dart';
 import '../posts/feed_page.dart';
 import '../communities/communities_page.dart';
+import '../challenges/challenges_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -24,6 +25,7 @@ class _HomePageState extends State<HomePage> {
   static const _pages = <Widget>[
     FeedPage(),
     ActivityPage(),
+    ChallengesPage(),
     CommunitiesPage(),
     ProfilePage(),
   ];
@@ -45,6 +47,10 @@ class _HomePageState extends State<HomePage> {
               icon: Icon(Icons.directions_bike_outlined),
               selectedIcon: Icon(Icons.directions_bike),
               label: 'Actividad'),
+          NavigationDestination(
+              icon: Icon(Icons.emoji_events_outlined),
+              selectedIcon: Icon(Icons.emoji_events),
+              label: 'Desafíos'),
           NavigationDestination(
               icon: Icon(Icons.groups_outlined),
               selectedIcon: Icon(Icons.groups),
