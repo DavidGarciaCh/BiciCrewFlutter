@@ -104,6 +104,60 @@ class ActivityRepository {
     });
   }
 
+  /// Ids de las actividades que ya están en este celular
+  Future<Set<String>> localIds(String userId) async {
+    final db = await _db;
+    final rows = await db.query('activities',
+        columns: ['id'], where: 'user_id = ?', whereArgs: [userId]);
+    return rows.map((r) => r['id'] as String).toSet();
+  }
+
+  /// Guarda en el celular una actividad descargada de Supabase.
+  /// Queda como terminada y sincronizada.
+  Future<void> insertFromServer(String userId, Map<String, dynamic> a) async {
+    final db = await _db;
+    final started =
+        DateTime.parse(a['started_at'] as String).millisecondsSinceEpoch;
+    final ended =
+        DateTime.parse(a['ended_at'] as String).millisecondsSinceEpoch;
+    final points = (a['points'] as List?) ?? const [];
+
+    await db.transaction((txn) async {
+      await txn.insert(
+        'activities',
+        {
+          'id': a['id'],
+          'user_id': userId,
+          'type': a['type'],
+          'status': 'finished',
+          'started_at': started,
+          'ended_at': ended,
+          'duration_s': (a['duration_seconds'] as num).toInt(),
+          'distance_m': (a['distance_meters'] as num).toDouble(),
+          'elevation_gain_m':
+              (a['elevation_gain_meters'] as num?)?.toDouble() ?? 0,
+          'sync_status': 'synced',
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+      // En el servidor cada punto es [lat, lng, alt, precisión, ms, tramo]
+      final batch = txn.batch();
+      for (final p in points) {
+        if (p is! List || p.length < 6) continue;
+        batch.insert('points', {
+          'activity_id': a['id'],
+          'segment': (p[5] as num).toInt(),
+          'lat': (p[0] as num).toDouble(),
+          'lng': (p[1] as num).toDouble(),
+          'alt': (p[2] as num).toDouble(),
+          'accuracy': (p[3] as num).toDouble(),
+          'time': (p[4] as num).toInt(),
+        });
+      }
+      await batch.commit(noResult: true);
+    });
+  }
+
   /// Marca la actividad como terminada y pendiente de sincronizar.
   Future<void> finish(
     String id, {

@@ -49,9 +49,12 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Future<void> _refresh() async {
     await _sync.syncPending();
+    final n = await _sync.restoreFromServer();
     await _load();
+    if (n > 0 && mounted) {
+      showMessage(context, 'Se recuperaron $n actividades de tu cuenta');
+    }
   }
-
   Future<void> _open(LocalActivity a) async {
     final result = await _repo.loadResult(a.id);
     if (result == null || !mounted) return;

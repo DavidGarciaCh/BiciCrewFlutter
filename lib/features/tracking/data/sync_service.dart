@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/supabase_config.dart';
 import 'activity_repository.dart';
+import 'dart:math';
 
 /// Sube a Supabase las actividades guardadas en el celular.
 class SyncService {
@@ -20,14 +21,61 @@ class SyncService {
 
   StreamSubscription<List<ConnectivityResult>>? _connSub;
   bool _running = false;
+  bool _restoring = false;
 
+  /// Descarga de Supabase las actividades que no están en este celular
+  /// (por ejemplo, tras reinstalar la app). Devuelve cuántas recuperó.
+  Future<int> restoreFromServer() async {
+    final user = supabase.auth.currentUser;
+    if (user == null || _restoring) return 0;
+    _restoring = true;
+    var restored = 0;
+    try {
+      // 1) Solo los ids: es una consulta liviana
+      final rows = await supabase
+          .from('activities')
+          .select('id')
+          .eq('user_id', user.id)
+          .order('started_at', ascending: false)
+          .limit(500);
+      final local = await _repo.localIds(user.id);
+      final missing = rows
+          .map((r) => r['id'] as String)
+          .where((id) => !local.contains(id))
+          .toList();
+
+      // 2) Las que faltan, de 10 en 10 (cada una trae sus puntos GPS)
+      for (var i = 0; i < missing.length; i += 10) {
+        final chunk = missing.sublist(i, min(i + 10, missing.length));
+        final data = await supabase
+            .from('activities')
+            .select('id, type, started_at, ended_at, duration_seconds, '
+                'distance_meters, elevation_gain_meters, points')
+            .inFilter('id', chunk);
+        for (final a in data) {
+          await _repo.insertFromServer(user.id, a);
+          restored++;
+        }
+      }
+    } catch (_) {
+      // Sin red: se reintentará al abrir la app o cuando vuelva la conexión
+    } finally {
+      _restoring = false;
+      if (restored > 0) version.value++; // el historial se refresca solo
+    }
+    return restored;
+  }
+
+  /// Llamar una vez con sesión iniciada. Es seguro llamarlo varias veces.
   /// Llamar una vez con sesión iniciada. Es seguro llamarlo varias veces.
   void start() {
     _connSub ??= Connectivity().onConnectivityChanged.listen((results) {
-      // Volvió alguna red: intentamos subir lo pendiente
-      if (results.any((r) => r != ConnectivityResult.none)) syncPending();
+      // Volvió alguna red: sube lo pendiente y recupera lo que falte
+      if (results.any((r) => r != ConnectivityResult.none)) {
+        syncPending().then((_) => restoreFromServer());
+      }
     });
-    syncPending();
+    syncPending().then((_) => restoreFromServer());
   }
 
   /// Devuelve cuántas actividades se subieron en esta pasada.
