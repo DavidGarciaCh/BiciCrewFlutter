@@ -41,6 +41,10 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       final notConfirmed = e.code == 'email_not_confirmed' ||
           e.message.toLowerCase().contains('not confirmed');
+     final blocked = e.code == 'user_blocked' ||
+          e.message.toLowerCase().contains('blocked');
+      final banned = e.code == 'user_banned' ||
+          e.message.toLowerCase().contains('banned');
       if (notConfirmed) {
         // La cuenta existe pero falta verificar el correo: reenviamos código.
         try {
@@ -51,7 +55,17 @@ class _LoginPageState extends State<LoginPage> {
           context,
           MaterialPageRoute(builder: (_) => VerifyOtpPage(email: email)),
         );
-      } else {
+      } else if (blocked) {
+        showMessage(
+            context, 'Usuario bloqueado.',
+            error: true);
+      }
+      else if (banned) {
+        showMessage(
+            context, 'Tu cuenta está suspendida. Contacta al soporte.',
+            error: true);
+      }
+       else {
         showMessage(context, 'Correo o contraseña incorrectos', error: true);
       }
     } catch (_) {

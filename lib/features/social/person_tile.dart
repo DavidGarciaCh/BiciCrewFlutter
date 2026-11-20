@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/utils.dart';
 import 'social_repository.dart';
+import '../moderation/report_sheet.dart';
   
 class PersonTile extends StatelessWidget {
   final Person person;
@@ -56,11 +57,16 @@ class PersonTile extends StatelessWidget {
       onSelected: (v) {
         if (v == 'remove') _removeFriend(context);
         if (v == 'block') _block(context);
+        if (v == 'report') {
+          showReportSheet(context,
+              userId: person.id, title: 'Reportar a ${person.fullName}');
+        }
       },
       itemBuilder: (_) => [
         if (canRemove)
           const PopupMenuItem(value: 'remove', child: Text('Eliminar amigo')),
         const PopupMenuItem(value: 'block', child: Text('Bloquear')),
+        const PopupMenuItem(value: 'report', child: Text('Reportar usuario')),
       ],
     );
   }

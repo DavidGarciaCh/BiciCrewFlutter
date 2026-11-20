@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../core/supabase_config.dart';
 import '../../core/utils.dart';
 import '../social/friends_page.dart';
+import '../moderation/admin_page.dart';
+import '../moderation/support_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -124,6 +126,33 @@ class _ProfilePageState extends State<ProfilePage> {
                   MaterialPageRoute(builder: (_) => const FriendsPage()),
                 ),
               ),
+                            const SizedBox(height: 8),
+              ListTile(
+                leading: const Icon(Icons.support_agent),
+                title: const Text('Ayuda y soporte'),
+                trailing: const Icon(Icons.chevron_right),
+                shape: RoundedRectangleBorder(
+                  side: BorderSide(color: Theme.of(context).dividerColor),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const SupportPage())),
+              ),
+              // Solo se muestra a administradores; la seguridad real está en la base de datos
+              if (_role == 'admin') ...[
+                const SizedBox(height: 8),
+                ListTile(
+                  leading: const Icon(Icons.admin_panel_settings_outlined),
+                  title: const Text('Panel de administración'),
+                  trailing: const Icon(Icons.chevron_right),
+                  shape: RoundedRectangleBorder(
+                    side: BorderSide(color: Theme.of(context).dividerColor),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  onTap: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const AdminPage())),
+                ),
+              ],
               const SizedBox(height: 24),
               _field(_firstName, 'Nombres', validator: _required),
               _field(_lastName, 'Apellidos', validator: _required),

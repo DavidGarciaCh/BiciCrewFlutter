@@ -5,6 +5,7 @@ import '../tracking/data/sync_service.dart';
 import '../posts/feed_page.dart';
 import '../communities/communities_page.dart';
 import '../challenges/challenges_page.dart';
+import '../../core/supabase_config.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -13,23 +14,69 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   int _index = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    SyncService.instance.start();
-  }
+  bool _suspendedShown = false;
 
   static const _pages = <Widget>[
     FeedPage(),
     ActivityPage(),
-    ChallengesPage(),
     CommunitiesPage(),
+    ChallengesPage(),
     ProfilePage(),
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    SyncService.instance.start();
+    _checkAccount();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _checkAccount();
+  }
+
+  /// Si un administrador suspendió la cuenta, se avisa y se cierra la sesión
+  Future<void> _checkAccount() async {
+    try {
+      final p = await supabase
+          .from('profiles')
+          .select('status')
+          .eq('id', supabase.auth.currentUser!.id)
+          .single();
+      if (p['status'] == 'suspended' && !_suspendedShown) {
+        _suspendedShown = true;
+        if (mounted) {
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => AlertDialog(
+              title: const Text('Cuenta suspendida'),
+              content: const Text(
+                  'Un administrador suspendió tu cuenta. Si crees que es un error, '
+                  'contacta al soporte.'),
+              actions: [
+                FilledButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Entendido'),
+                ),
+              ],
+            ),
+          );
+        }
+        await supabase.auth.signOut();
+      }
+    } catch (_) {}
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(

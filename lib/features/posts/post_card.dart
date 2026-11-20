@@ -8,6 +8,7 @@ import 'posts_repository.dart';
 import 'route_map.dart';
 import 'attendees_page.dart';
 import 'post_image.dart';
+import '../moderation/report_sheet.dart';
 
 class PostCard extends StatefulWidget {
   final Post post;
@@ -285,6 +286,15 @@ class _PostCardState extends State<PostCard> {
                     itemBuilder: (_) => const [
                       PopupMenuItem(value: 'edit', child: Text('Editar')),
                       PopupMenuItem(value: 'delete', child: Text('Eliminar')),
+                    ],
+                  )
+                  else if (!mine)
+                  PopupMenuButton<String>(
+                    onSelected: (_) => showReportSheet(context,
+                        postId: p.id, title: 'Reportar publicación'),
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                          value: 'report', child: Text('Reportar publicación')),
                     ],
                   ),
               ],

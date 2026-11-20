@@ -9,8 +9,14 @@ class _CachedUrl {
 
 class PostImage extends StatefulWidget {
   final String path;
+  final String bucket;
   final double height;
-  const PostImage({super.key, required this.path, this.height = 220});
+  const PostImage({
+    super.key,
+    required this.path,
+    this.bucket = 'post-images',
+    this.height = 220,
+  });
 
   @override
   State<PostImage> createState() => _PostImageState();
@@ -18,17 +24,17 @@ class PostImage extends StatefulWidget {
 
 class _PostImageState extends State<PostImage> {
   static final Map<String, _CachedUrl> _cache = {};
-  late final Future<String> _url = _signedUrl(widget.path);
+    late final Future<String> _url = _signedUrl(widget.bucket, widget.path);
 
-  static Future<String> _signedUrl(String path) async {
-    final cached = _cache[path];
+  static Future<String> _signedUrl(String bucket, String path) async {
+    final key = '$bucket/$path';
+    final cached = _cache[key];
     if (cached != null && cached.expires.isAfter(DateTime.now())) {
       return cached.url;
     }
     // Bucket privado: la URL firmada caduca en 1 hora
-    final url =
-        await supabase.storage.from('post-images').createSignedUrl(path, 3600);
-    _cache[path] =
+    final url = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
+    _cache[key] =
         _CachedUrl(url, DateTime.now().add(const Duration(minutes: 50)));
     return url;
   }
